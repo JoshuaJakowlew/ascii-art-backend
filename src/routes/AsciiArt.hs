@@ -4,17 +4,18 @@
 module Routes.AsciiArt ( asciiArt
                        ) where
 
-import           Data.Aeson            hiding (json)                        
-import           Web.Spock
-import           Data.Text                    (Text, pack, unpack)
-import           Data.Maybe                   (fromJust, isJust)
-import           Network.Curl.Download        (openURI)
-import           Data.ByteString        as BS (ByteString, writeFile)
 import           Control.Monad.IO.Class       (liftIO)
-import           Data.GUID                    (genString)
-import           System.Process               (system)
 import           Data.Functor                 (($>))
+import           Data.ByteString        as BS (ByteString, writeFile)
+import           Data.Text                    (Text, pack, unpack)
 import           GHC.Generics
+
+import           Data.Aeson            hiding (json)                        
+import           Data.GUID                    (genString)
+import           Network.Curl.Download        (openURI)
+import           System.Process               (system)
+import           Web.Spock
+
 import           Config
 
 data AsciiArtRequest = InvalidRequest
@@ -44,11 +45,20 @@ asciiArt = getUrl >>= loadFile >>= sendArt
         sendJSON success' art' = json $ AsciiArtResponse { success = success', art = art' }
 
 
+
+-- PARSE REQUEST PARAMS
+
+
 getParams :: ApiAction AsciiArtRequest
 getParams = buildRequest <$> param "url"
     where
         buildRequest (Just url) = AsciiArtRequest url
         buildRequest Nothing    = InvalidRequest
+
+
+
+-- PROCESS IMAGE
+
 
 loadFile :: String -> ApiAction (Maybe ByteString)
 loadFile url = getBytes <$> (liftIO . openURI $ url)
