@@ -15,4 +15,5 @@ runApp = do
 
 app :: Api
 app = do
-    get "asciiArt" $ asciiArt
+    get  "asciiArt" $ getAsciiArt
+    post "asciiArt" $ postAsciiArt

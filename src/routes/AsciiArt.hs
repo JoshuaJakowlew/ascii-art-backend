@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric     #-}
 
-module Routes.AsciiArt ( asciiArt
+module Routes.AsciiArt ( getAsciiArt
+                       , postAsciiArt
                        ) where
 
 import           Control.Monad.IO.Class       (liftIO)
@@ -12,9 +13,11 @@ import           GHC.Generics
 
 import           Data.Aeson            hiding (json)                        
 import           Data.GUID                    (genString)
+import           Data.HashMap.Strict    as HM (HashMap, lookup)
 import           Network.Curl.Download        (openURI)
 import           System.Process               (system)
 import           Web.Spock
+import Data.Maybe(fromJust)
 
 import           Config
 
@@ -29,24 +32,22 @@ data AsciiArtResponse = AsciiArtResponse { success :: Bool
 instance ToJSON   AsciiArtResponse
 
 
-asciiArt :: ApiAction ()
-asciiArt = getUrl >>= loadFile >>= sendArt
+getAsciiArt :: ApiAction ()
+getAsciiArt = getUrl >>= loadFile >>= sendArt
     where
         getUrl = unpack . urlParam <$> getParams
-        
-        sendArt (Just bytes) = do
-            aArt <- pack <$> (liftIO $ processImage bytes)
-            sendJSON True (Just aArt)
-        sendArt Nothing      =
-            sendJSON False Nothing
 
-        processImage bytes = writeTempFile bytes >>= runConverter >>= readFile            
-
-        sendJSON success' art' = json $ AsciiArtResponse { success = success', art = art' }
+postAsciiArt :: ApiAction ()
+postAsciiArt = getUrl >>= loadFile >>= sendArt
+    where
+        getUrl = ( ("file:///" ++)
+                 . uf_tempLocation
+                 . fromJust
+                 . HM.lookup "image") <$> files
 
 
 
--- PARSE REQUEST PARAMS
+-- HANDLE REQUESTS PARAMS
 
 
 getParams :: ApiAction AsciiArtRequest
@@ -54,6 +55,19 @@ getParams = buildRequest <$> param "url"
     where
         buildRequest (Just url) = AsciiArtRequest url
         buildRequest Nothing    = InvalidRequest
+
+sendArt :: Maybe ByteString -> ApiAction ()
+sendArt (Just bytes) = do
+    aArt <- pack <$> (liftIO $ processImage bytes)
+    sendJSON True (Just aArt)
+sendArt Nothing      =
+    sendJSON False Nothing
+
+processImage :: ByteString -> IO (String)
+processImage bytes = writeTempFile bytes >>= runConverter >>= readFile            
+
+sendJSON :: Bool -> Maybe Text -> ApiAction ()
+sendJSON success' art' = json $ AsciiArtResponse { success = success', art = art' }
 
 
 
@@ -73,4 +87,4 @@ runConverter :: String -> IO String
 runConverter filename = system command $> filename'
     where
         filename' = filename ++ ".txt"
-        command   = "ascii-art-exe " ++ filename ++ " > " ++ filename'
+        command   = "I2AA " ++ filename ++ " > " ++ filename'
